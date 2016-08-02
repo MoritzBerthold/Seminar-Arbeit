@@ -1,15 +1,46 @@
-#require_relative "rails"
-#include Rails
+require_relative "rails"
+include Rails
 
-=begin
-project = Project.new("blog",nil,nil,nil)
+documents = {}
+DATA.each_line do |line|
+  p line
+  if line.strip.empty?
+  elsif line.start_with?('---')
+    @name = line.delete! "-:\n\r"
+    p "Adding new document #{@name}..."
+    documents[@name] = ""
+  else
+    if documents[@name].nil?
+      documents[@name] = ""
+    end
+    p "Adding #{line} to #{@name}..."
+    documents[@name] += line
+  end
+end
+
+#=begin
+project = Project.new("blog",nil,nil,documents["routes.rb"])
 articles_controller = Controller.new("Articles",["_form","show","view","edit"])
 project.add_controller(articles_controller)
 article_model = Model.new("Article",[Model_Field.new("title","string"),Model_Field.new("text","text")])
 project.add_model(article_model)
 generate(project)
-=end
-puts DATA.read
+#=end
+
+documents.each do |name,content|
+  if name.end_with?(".html.erb")
+    path = "#{Dir.pwd}/app/views/articles"
+  elsif name["controller"]
+    path = "#{Dir.pwd}/app/controllers"
+  elsif name["routes"]
+    path = "#{Dir.pwd}/config"
+  elsif name["article"]
+    path = "#{Dir.pwd}/app/models"
+  end
+  Dir.open(path) do |dir|
+    File.open(name,"w+") {|f| f.write(content)}
+  end
+end
 
 =begin
 puts "Generating project..."
@@ -172,96 +203,74 @@ __END__
 ---routes.rb:
 Rails.application.routes.draw do
   get 'welcome/index'
-
   resources :articles
-
   root "welcome#index"
 end
-
 ---articles_controller.rb
 class ArticlesController < ApplicationController
-	def index
-		@articles = Article.all
-	end
-
-	def show
+  def index
+    @articles = Article.all
+  end
+  def show
+    @article = Article.find(params[:id])
+  end
+  def new
+    @article = Article.new
+  end
+  def edit
 		@article = Article.find(params[:id])
 	end
-
-	def new
-		@article = Article.new
-	end
-
-	def edit
-		@article = Article.find(params[:id])
-	end
-
 	def create
-		@article = Article.new(article_params)
-
-		if @article.save
-    		redirect_to @article
-		else
-    		render 'new'
-		end
-	end
-
-	def update
-		@article = Article.find(params[:id])
-
-  		if @article.update(article_params)
-    		redirect_to @article
-  		else
-    		render 'edit'
-  		end
-	end
-
-	def destroy
-		@article = Article.find(params[:id])
-		@article.destroy
-
-		redirect_to articles_path
-	end
-
-	private
-		def article_params
-			params.require(:article).permit(:title, :text)
-		end
+    @article = Article.new(article_params)
+    if @article.save
+      redirect_to @article
+    else
+      render 'new'
+    end
+  end
+  def update
+    @article = Article.find(params[:id])
+    if @article.update(article_params)
+      redirect_to @article
+    else
+      render 'edit'
+    end
+  end
+  def destroy
+    @article = Article.find(params[:id])
+    @article.destroy
+    redirect_to articles_path
+  end
+  private
+    def article_params
+      params.require(:article).permit(:title, :text)
+    end
 end
-
 ---article.rb
 class Article < ActiveRecord::Base
-	validates :title, presence: true, length: { minimum: 5 }
+  validates :title, presence: true, length: { minimum: 5 }
 end
-
 ---index.html.erb
 <h1>Alle Beiträge</h1>
-
 <%= link_to "Neuer Beitrag", new_article_path %>
-
 <table>
   <tr>
     <th>Title</th>
     <th>Text</th>
   </tr>
-
   <% @articles.each do |article| %>
     <tr>
       <td><%= article.title %></td>
       <td><%= article.text %></td>
       <td><%= link_to 'Anzeigen', article_path(article) %></td>
       <td><%= link_to "Bearbeiten", edit_article_path(article) %></td>
-      <td><%= link_to 'Destroy', article_path(article),
-              method: :delete,
-              data: { confirm: 'Are you sure?' } %></td>
+      <td><%= link_to 'Destroy', article_path(article), method: :delete, data: { confirm: 'Are you sure?' } %></td>
     </tr>
   <% end %>
 </table>
-
 ---_form.html.erb
 <%= form_for :article, url: articles_path do |f| %>
-
-	<% if @article.errors.any? %>
+  <% if @article.errors.any? %>
     <div id="error_explanation">
       <h2>
         <%= pluralize(@article.errors.count, "error") %> prohibited
@@ -273,48 +282,36 @@ end
         <% end %>
       </ul>
     </div>
-	<% end %>
-
-	<p>
-		<%= f.label :title %><br>
-		<%= f.text_field :title %>
-	</p>
-
-	<p>
-		<%= f.label :text %><br>
-		<%= f.text_area :text %>
-	</p>
-
-	<p>
-		<%= f.submit %>
-	</p>
+  <% end %>
+  <p>
+    <%= f.label :title %><br>
+    <%= f.text_field :title %>
+  </p>
+  <p>
+    <%= f.label :text %><br>
+    <%= f.text_area :text %>
+  </p>
+  <p>
+    <%= f.submit %>
+  </p>
 <% end%>
-
 ---show.html.erb
 <h1>Beitrag</h1>
 <p>
   <strong>Title:</strong>
   <%= @article.title %>
 </p>
-
 <p>
   <strong>Text:</strong>
   <%= @article.text %>
 </p>
-
 <%= link_to "Bearbeiten", edit_article_path(@article) %>
 <%= link_to "Zurück", articles_path %>
-
 ---new.html.erb
 <h1>Neuer Beitrag</h1>
-
 <%= render "form" %>
-
 <%= link_to "Zurück", articles_path %>
-
 ---edit.html.erb
 <h1>Beitrag bearbeiten</h1>
-
 <%= render "form" %>
-
 <%= link_to 'Zurück', articles_path %>

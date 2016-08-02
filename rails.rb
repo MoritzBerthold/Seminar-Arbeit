@@ -61,7 +61,7 @@ module Rails
       end
 
       if configuration.nil?
-        @configuration = Configuration.new
+        @configuration = Configuration.new("")
       else
         @configuration = Configuration.new(configuration)
       end
@@ -137,7 +137,9 @@ module Rails
     @routes
 
     def initialize(routes)
-      @routes = String.new(routes)
+      unless routes.nil?
+        @routes = String.new(routes)
+      end
     end
   end
 end
